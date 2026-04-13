@@ -7,3 +7,5 @@ checkpoints.db
 *.pdf
 *.aux
 *.log
+checkpoints.db-shm
+checkpoints.db-wal
