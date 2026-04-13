@@ -9,3 +9,5 @@ checkpoints.db
 *.log
 checkpoints.db-shm
 checkpoints.db-wal
+checkpoints.db-shm
+checkpoints.db-wal
