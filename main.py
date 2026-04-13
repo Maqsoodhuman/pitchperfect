@@ -1,41 +1,47 @@
 """
-Phase 1 end-to-end entry point.
+Phase 2 end-to-end entry point.
 
-Runs the full LangGraph pipeline on hardcoded fixtures and prints the result.
-No UI, no DB, no PDF generation in Phase 1 — just proof that the agents
-work together.
-
-Later phases will replace this with a Streamlit UI (Phase 3) that calls
-the same graph with real user inputs.
+Saves the fixture resume to Supabase under a test user, then invokes
+the graph with just user_id + jd_text. The graph loads base_resume
+from the DB automatically via the intake node.
 """
 
 from dotenv import load_dotenv
 load_dotenv()
 
 from app.graph import graph
+from app.storage import save_resume
 from test_fixtures import SAMPLE_RESUME_TEX, SAMPLE_JD
 
 
+TEST_USER_ID = "11111111-1111-1111-1111-111111111111"
+
+
 def run():
-    # Build initial state — the graph expects these fields set upfront.
-    # In later phases, `user_id` will drive Supabase lookup for base_resume.
+    # Step 1: ensure the test user has a resume saved in the DB.
+    # In Phase 3+, the user does this once via the Streamlit UI.
+    print("Saving test resume to Supabase...")
+    save_resume(TEST_USER_ID, SAMPLE_RESUME_TEX)
+    print(f"  ✅ saved for user {TEST_USER_ID}\n")
+
+    # Step 2: invoke the graph with user_id + jd_text only.
+    # Intake will load base_resume from the DB.
     initial_state = {
-        "user_id": "phase1-test-user",
+        "user_id": TEST_USER_ID,
         "jd_text": SAMPLE_JD,
-        "request_type": "both",          # "resume" | "cover_letter" | "both"
-        "base_resume": SAMPLE_RESUME_TEX,  # hardcoded in Phase 1
+        "request_type": "both",
         "retry_count": 0,
+        # NOTE: no base_resume here — intake loads it from the DB
     }
 
     print("=" * 60)
-    print("  PitchPerfect — Phase 1 End-to-End Run")
+    print("  PitchPerfect — Phase 2 End-to-End Run")
     print("=" * 60)
+    print(f"User ID:      {TEST_USER_ID}")
     print(f"Request type: {initial_state['request_type']}")
-    print(f"Base resume:  {len(SAMPLE_RESUME_TEX)} chars")
     print(f"JD:           {len(SAMPLE_JD)} chars")
     print()
 
-    # Invoke the compiled graph
     final_state = graph.invoke(initial_state)
 
     # ===== Pretty-print the result =====
@@ -48,6 +54,13 @@ def run():
     print(f"Tone:     {analysis.get('tone')}")
     print(f"Skills:   {analysis.get('skills')}")
     print(f"Keywords: {analysis.get('keywords')}")
+
+    print("\n" + "=" * 60)
+    print("  Base Resume (loaded from DB)")
+    print("=" * 60)
+    loaded = final_state.get("base_resume", "")
+    print(f"Length: {len(loaded)} chars")
+    print(f"Match:  {'✅ matches fixture' if loaded == SAMPLE_RESUME_TEX else '❌ mismatch'}")
 
     print("\n" + "=" * 60)
     print("  Tailored Resume")
@@ -74,15 +87,25 @@ def run():
     print("=" * 60)
     report = final_state.get("eval_report", {})
     print(f"Passed:             {report.get('passed')}")
-    print(f"Truthfulness score: {report.get('truthfulness_score'):.2f}")
-    print(f"ATS score:          {report.get('ats_score'):.2f}")
-    print(f"Tone score:         {report.get('tone_score'):.2f}")
+    print(f"Divergence score:   {report.get('divergence_score', 0):.2f}  (1.0 = no changes, 0.0 = heavy rewriting)")
+    print(f"ATS score:          {report.get('ats_score', 0):.2f}")
+    print(f"Tone score:         {report.get('tone_score', 0):.2f}")
     print(f"Retry count:        {final_state.get('retry_count')}")
+    print(f"Matched keywords:   {report.get('matched_keywords', [])}")
+    print(f"Missing keywords:   {report.get('missing_keywords', [])}")
     print(f"Issues ({len(report.get('issues', []))}):")
     for i, issue in enumerate(report.get("issues", []), 1):
         print(f"  {i}. {issue}")
 
-    # Optional: save the tailored outputs to disk so you can compile them manually
+    added = report.get("added_items", [])
+    print(f"\nAdded items ({len(added)}) — content in tailored output NOT in base resume:")
+    if added:
+        for item in added:
+            print(f"  + {item}")
+        print("  (Surfaced for transparency. In Phase 5 you'll confirm or reject each one.)")
+    else:
+        print("  (none)")
+
     if tailored:
         with open("output_resume.tex", "w") as f:
             f.write(tailored)
@@ -94,7 +117,7 @@ def run():
         print("Cover letter saved to output_cover_letter.tex")
 
     print("\n" + "=" * 60)
-    print("  Phase 1 end-to-end run complete ✅")
+    print("  Phase 2 end-to-end run complete ✅")
     print("=" * 60)
 
 

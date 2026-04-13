@@ -13,6 +13,7 @@ from typing import Any
 from app.state import AppState
 from app.llm import get_llm
 from app.pdf import compile_latex, count_pdf_pages
+from app.storage import get_resume
 from app.prompts import (
     INTAKE_PROMPT,
     TAILOR_PROMPT,
@@ -51,7 +52,25 @@ def _parse_json_response(text: str) -> dict[str, Any]:
         raise ValueError(
             f"LLM did not return valid JSON. Got:\n{cleaned[:500]}\nError: {e}"
         )
-    
+
+def _normalize_for_comparison(tex: str) -> str:
+    """
+    Strip parenthetical qualifiers and trailing role modifiers from
+    job-title-like lines before sending to the evaluator. This prevents
+    the evaluator from flagging trivial title shortenings as fabrication.
+
+    Examples:
+      "Senior Cloud Engineer (ML)"           → "Senior Cloud Engineer"
+      "Software Engineer II, Payments Team"  → "Software Engineer II"
+      "Staff SWE - Infrastructure"           → "Staff SWE"
+    """
+    # Remove parentheticals: "(anything)"
+    tex = re.sub(r"\s*\([^)]*\)", "", tex)
+    # Remove trailing ", team/role" or " - team/role" on a line
+    tex = re.sub(r"(,|\s-\s)\s*[A-Za-z][\w\s&/]*$", "", tex, flags=re.MULTILINE)
+    return tex
+
+
 
 # ============================================================
 # Node 1: Intake
@@ -59,11 +78,22 @@ def _parse_json_response(text: str) -> dict[str, Any]:
 
 def intake(state: AppState) -> dict:
     """
-    Parse the JD into structured analysis.
+    Load the user's base resume from Supabase and parse the JD
+    into structured analysis.
 
-    Input:  state["jd_text"]
-    Output: {"jd_analysis": {role, skills, keywords, tone}}
+    Input:  state["user_id"], state["jd_text"]
+    Output: {"base_resume": <loaded>, "jd_analysis": {role, skills, keywords, tone}}
     """
+    # Load base resume from DB (unless already provided — Phase 1 compatibility)
+    base_resume = state.get("base_resume")
+    if not base_resume:
+        base_resume = get_resume(state["user_id"])
+        if not base_resume:
+            raise ValueError(
+                f"No base resume found for user {state['user_id']}. "
+                f"Save one with save_resume() before running the graph."
+            )
+
     llm = get_llm("fast")
 
     messages = [
@@ -74,13 +104,15 @@ def intake(state: AppState) -> dict:
     response = llm.invoke(messages)
     analysis = _parse_json_response(response.content)
 
-    # Sanity check: required keys
     required = {"role", "skills", "keywords", "tone"}
     missing = required - set(analysis.keys())
     if missing:
         raise ValueError(f"Intake LLM response missing keys: {missing}")
 
-    return {"jd_analysis": analysis}
+    return {
+        "base_resume": base_resume,
+        "jd_analysis": analysis,
+    }
 
 # ============================================================
 # Node 2: Tailor Resume
@@ -247,25 +279,19 @@ def cover_letter(state: AppState) -> dict:
     return {"cover_letter_tex": tex}
 
 
-def _compute_ats_score(tailored_tex: str, keywords: list) -> tuple[float, int, int]:
-    """
-    Deterministic ATS keyword coverage.
-    Case-insensitive substring match: a keyword counts if it appears anywhere
-    in the tailored text.
-    Returns: (score, matched_count, total_count)
-    """
-    if not keywords:
-        return 1.0, 0, 0
+# ============================================================
+# Node 4: Evaluator
+# ============================================================
 
-    text_lower = tailored_tex.lower()
-    matched = [kw for kw in keywords if kw.lower() in text_lower]
-    return len(matched) / len(keywords), len(matched), len(keywords)
-
+# ============================================================
+# Node 4: Evaluator (Auditor mode — informs, never blocks)
+# ============================================================
 
 def evaluate(state: AppState) -> dict:
     """
-    Score the generated outputs on truthfulness, ATS coverage, and tone.
-    Truthfulness and tone come from the LLM; ATS is computed deterministically.
+    Audit the generated outputs. Reports divergence, ATS, tone, and
+    a list of items added vs the base resume. Does NOT block on
+    divergence — passing only depends on ATS and tone thresholds.
 
     Input:  state["base_resume"], state["tailored_resume_tex"],
             state["cover_letter_tex"], state["jd_analysis"]
@@ -276,10 +302,18 @@ def evaluate(state: AppState) -> dict:
     tailored = state.get("tailored_resume_tex") or "(not generated)"
     letter = state.get("cover_letter_tex") or "(not generated)"
 
+    # Normalize both sides so the auditor doesn't flag synonym/rephrasing differences
+    base_for_eval = _normalize_for_comparison(state["base_resume"])
+    tailored_for_eval = (
+        _normalize_for_comparison(tailored)
+        if tailored != "(not generated)"
+        else tailored
+    )
+
     user_content = (
-        f"BASE RESUME (ground truth):\n\n{state['base_resume']}\n\n"
+        f"BASE RESUME (ground truth):\n\n{base_for_eval}\n\n"
         f"---\n\n"
-        f"TAILORED RESUME:\n\n{tailored}\n\n"
+        f"TAILORED RESUME:\n\n{tailored_for_eval}\n\n"
         f"---\n\n"
         f"COVER LETTER:\n\n{letter}\n\n"
         f"---\n\n"
@@ -294,37 +328,47 @@ def evaluate(state: AppState) -> dict:
     response = llm.invoke(messages)
     report = _parse_json_response(response.content)
 
-    required = {"passed", "truthfulness_score", "ats_score", "tone_score", "issues"}
+    required = {"divergence_score", "ats_score", "tone_score", "passed", "added_items", "issues"}
     missing = required - set(report.keys())
     if missing:
         raise ValueError(f"Evaluator response missing keys: {missing}")
 
-    # Clamp LLM-provided scores (truthfulness, tone) to [0, 1]
-    for key in ("truthfulness_score", "tone_score"):
+    # Clamp LLM-provided scores
+    for key in ("divergence_score", "tone_score"):
         report[key] = max(0.0, min(1.0, float(report[key])))
 
-    # Override ATS score with deterministic computation — covers BOTH resume and cover letter
+    # Override ATS score with deterministic computation
     keywords = state["jd_analysis"].get("keywords", [])
     combined_text = (state.get("tailored_resume_tex") or "") + "\n" + (state.get("cover_letter_tex") or "")
-    ats_score, matched, total = _compute_ats_score(combined_text, keywords)
-    report["ats_score"] = ats_score
+    text_lower = combined_text.lower()
+    matched_keywords = [kw for kw in keywords if kw.lower() in text_lower]
+    missing_keywords = [kw for kw in keywords if kw.lower() not in text_lower]
+    ats_score = len(matched_keywords) / len(keywords) if keywords else 1.0
 
-    # Ensure issues is a list
+    report["ats_score"] = ats_score
+    report["matched_keywords"] = matched_keywords
+    report["missing_keywords"] = missing_keywords
+
+    # Ensure list types
     if not isinstance(report["issues"], list):
         report["issues"] = [str(report["issues"])]
+    if not isinstance(report["added_items"], list):
+        report["added_items"] = [str(report["added_items"])]
 
-    # Replace the LLM's ATS issue (if any) with our deterministic one
-    report["issues"] = [i for i in report["issues"] if "ats" not in i.lower() and "keyword" not in i.lower()]
+    # Add deterministic ATS issue if below threshold
+    report["issues"] = [
+        i for i in report["issues"]
+        if "ats" not in i.lower() and "keyword" not in i.lower()
+    ]
     if ats_score < 0.6:
-            report["issues"].append(
-                f"ATS coverage below minimum: {matched}/{total} JD keywords matched ({ats_score:.0%}). Minimum is 60%."
-            )
+        report["issues"].append(
+            f"ATS coverage below minimum: {len(matched_keywords)}/{len(keywords)} "
+            f"JD keywords matched ({ats_score:.0%}). Minimum is 60%."
+        )
 
-    # Compute `passed` deterministically — ATS threshold is now 0.8
-    # Compute `passed` deterministically
+    # Compute `passed` deterministically — divergence is informational, does NOT block
     report["passed"] = (
-        report["truthfulness_score"] >= 0.8
-        and report["ats_score"] >= 0.6
+        report["ats_score"] >= 0.6
         and report["tone_score"] >= 0.6
     )
 

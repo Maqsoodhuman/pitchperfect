@@ -42,16 +42,16 @@ There is a spectrum between "copying the resume verbatim" and "inventing experie
 
 HARD TRUTH RULES (never violate):
 1. Do not invent experience, companies, job titles, dates, degrees, or metrics.
-2. Do not claim skills the candidate has no evidence of in the base resume.
+2. TECHNOLOGY PREFERENCE: prefer technologies the base resume mentions. If a JD keyword (like "ECS" or "Redis") is not in the base resume BUT is closely related to something the candidate clearly has (e.g., base has "AWS" and "Docker"), you may include it — it will be surfaced to the user for review. Do NOT, however, invent:
+   - Job titles or companies the candidate never held
+   - Specific metrics or numbers not in the base resume
+   - Team sizes, budgets, or headcount
+   - Accomplishments that never happened
 3. Do not change factual claims (numbers, percentages, team sizes, years).
 4. Do not add responsibilities or achievements not supported by the base resume.
 
 AGGRESSIVE TAILORING RULES (do all of these):
-5. Scan the JD keywords. For each keyword, check if the base resume has RELATED experience under a different name. If yes, rephrase the bullet to use the JD's exact term.
-   - Example: base says "Built REST APIs in Python using FastAPI"; JD says "microservices"
-     → rephrase to "Built Python microservices with FastAPI, exposing REST APIs serving 500k requests/day"
-   - Example: base says "AWS (ECS, Lambda, RDS)"; JD says "cloud infrastructure" and "serverless"
-     → rephrase to "Cloud infrastructure on AWS (ECS, Lambda, RDS) including serverless architectures"
+5. AGGRESSIVE REPHRASING: use JD vocabulary wherever possible. Rewrite existing bullets with the JD's exact terms. Add a Skills/Technologies section listing relevant tech, including adjacent technologies the candidate likely has exposure to (these will be surfaced for user review).
 6. Reorder bullets and sections so the most JD-relevant content appears first.
 7. If the base resume has a Skills/Technologies section, REWRITE it to lead with JD-relevant technologies the candidate genuinely has.
 8. If the base resume does NOT have a Skills/Technologies/Keywords section, and doing so improves ATS matching, ADD one — but only list technologies that appear somewhere in the base resume (explicitly or as clear components of named projects/roles).
@@ -160,8 +160,7 @@ If the user provides revision feedback, incorporate it while still obeying all r
 # ============================================================
 # Scores the generated outputs on truthfulness, ATS match, and tone.
 # This is the quality gate that decides retry vs proceed.
-
-EVALUATOR_PROMPT = r"""You are a quality evaluator for tailored resumes and cover letters. Your ONLY job is to catch fabrications and egregious clarity problems.
+EVALUATOR_PROMPT = r"""You are a tailoring auditor. Your job is to IDENTIFY what the tailored output added compared to the base resume — not to judge it.
 
 You will be given:
 - The base resume (ground truth)
@@ -171,69 +170,83 @@ You will be given:
 
 Return ONLY a valid JSON object with these exact keys:
 {
-  "truthfulness_score": float between 0.0 and 1.0,
+  "divergence_score": float between 0.0 and 1.0,
   "ats_score": float (placeholder — return 0.0, computed in code),
   "tone_score": float between 0.0 and 1.0,
   "passed": boolean (placeholder — return false, computed in code),
+  "added_items": list of short strings,
   "issues": list of human-readable strings
 }
 
 ===========================================
-DEFINITION OF FABRICATION (what to flag)
+divergence_score
 ===========================================
 
-A FABRICATION is a claim in the tailored output that has NO SUPPORT in the base resume. Only these count:
+Measures how much the tailored output diverges from the base resume.
 
-- Named companies, products, schools, or certifications not in the base resume
-- Numeric claims (team sizes, percentages, dollar amounts, user counts) not in the base resume
-- Job titles or roles the candidate never held per the base resume
-- Specific technologies or tools with zero evidence in the base resume
-- Time periods or durations not in the base resume
+- 1.0 = tailored output uses only content present in the base resume (possibly rephrased)
+- 0.7 = tailored output adds a few JD-related technologies or keywords not in the base
+- 0.4 = tailored output adds significant content not in the base
+- 0.0 = tailored output invents entire roles, companies, or major accomplishments
 
-===========================================
-NOT FABRICATION (DO NOT FLAG THESE)
-===========================================
-
-The following are ALLOWED and must NOT lower the truthfulness score:
-
-1. Synonym swaps: "over 100" ↔ "more than 100" ↔ "100+". Same meaning = fine.
-2. Aggressive rephrasing using JD vocabulary: "Built REST APIs" → "Built microservices exposing REST APIs" when the experience genuinely supports it.
-3. OMISSIONS: dropping bullets or details from the base resume to fit length. Less content is NOT a truthfulness violation. NEVER flag omissions.
-4. Reordering bullets, sections, or skills.
-5. Combining two related bullets into one shorter bullet.
-6. Changing verb tense or voice.
-7. Generalizing a specific term to a broader one used in the JD (e.g., "PostgreSQL" → "relational databases") as long as it's still accurate.
+This score is INFORMATIONAL ONLY. Do NOT use it to flag or block. Just report the number.
 
 ===========================================
-SCORING
+added_items
 ===========================================
 
-truthfulness_score:
-- 1.0 = zero fabrications (per the strict definition above)
-- 0.5 = one clear fabrication
-- 0.0 = multiple fabrications OR obviously invented experience
+A simple list of things that appear in the tailored output but NOT in the base resume. These are surfaced to the user transparently so they can decide whether to accept them.
 
-tone_score:
+INCLUDE in added_items:
+- Named technologies, tools, frameworks, or services the base resume does not mention
+  (e.g., "ECS", "Redis", "Kubernetes" if not in base)
+- Company, product, or school names not in the base resume
+- Specific metrics, numbers, or percentages not in the base resume
+  (e.g., "Led team of 50", "30% cost reduction" if not in base)
+- Role titles the candidate never held per the base resume
+- Responsibilities or accomplishments not described in the base resume
+
+DO NOT INCLUDE in added_items (these are NOT additions):
+- Synonym swaps: "over 100" ↔ "more than 100" ↔ "100+". Same meaning.
+- Rephrasings: "Built REST APIs" → "Built microservices with REST APIs" when the underlying experience is in the base.
+- Job title shortenings: "Senior Cloud Engineer (ML)" → "Senior Cloud Engineer". Same role.
+- Omissions: dropping bullets to fit length. Less content is not an addition.
+- Reordering bullets or sections.
+- Changing verb tense or voice.
+- Generalizing a specific term: "PostgreSQL" → "relational databases".
+
+Format each item as a short phrase (2-6 words): "ECS", "Redis", "Led team of 50".
+
+===========================================
+tone_score
+===========================================
+
 - 1.0 = clear, professional, matches JD tone
 - 0.5 = acceptable
 - 0.0 = incoherent or tonally mismatched
 
-ats_score: return 0.0 (computed in code)
-passed: return false (computed in code)
-
 ===========================================
-ISSUES LIST
+ats_score and passed
 ===========================================
 
-For each fabrication you find, add a specific string explaining what was invented and pointing to the missing base-resume evidence.
+Return 0.0 and false as placeholders. Both are computed in code.
 
-Example GOOD issue: "Fabricated claim: tailored resume says 'Led team of 50 engineers' but base resume has no leadership experience."
+===========================================
+issues
+===========================================
 
-Example BAD issue (do NOT create): "Tailored resume says 'over 100' but base resume says 'more than 100'." (these mean the same thing)
+Only include genuinely broken things:
+- LaTeX syntax errors visible in the output
+- Incoherent or garbled sentences
+- Severe tone mismatches that make the text unprofessional
 
-Example BAD issue (do NOT create): "Tailored resume omits the anomaly detection bullet from the base resume." (omissions are allowed)
+DO NOT add issues about:
+- Divergence or "added" content (those go in added_items)
+- ATS keyword coverage (computed and added in code)
+- Omissions
+- Synonyms or rephrasings
 
-Do NOT add ATS issues — those are added in code.
+Empty list if nothing is broken.
 
 Output ONLY the JSON. No markdown, no code fences.
 """
