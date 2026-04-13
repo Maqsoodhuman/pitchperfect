@@ -70,6 +70,38 @@ def _normalize_for_comparison(tex: str) -> str:
     tex = re.sub(r"(,|\s-\s)\s*[A-Za-z][\w\s&/]*$", "", tex, flags=re.MULTILINE)
     return tex
 
+def _escape_unescaped_percent(tex: str) -> str:
+    """
+    Replace unescaped `%` with `\\%` in LaTeX body content.
+    Skips `%` that is already escaped (preceded by a backslash).
+    """
+    return re.sub(r"(?<!\\)%", r"\\%", tex)
+
+
+def _escape_cover_letter_specials(tex: str) -> str:
+    """
+    Escape LaTeX special characters that commonly appear in company names
+    and JD titles but break compilation if unescaped.
+
+    Handles: %, &
+    Focuses on prose lines only — skips lines that start with a LaTeX
+    command or a comment, so we don't break valid commands like \\&
+    or valid table content.
+    """
+    lines = tex.split("\n")
+    fixed_lines = []
+    for line in lines:
+        stripped = line.lstrip()
+        # Skip LaTeX command lines and comment lines — they legitimately use these chars
+        if stripped.startswith("\\") or stripped.startswith("%"):
+            fixed_lines.append(line)
+            continue
+        # Escape unescaped %
+        line = re.sub(r"(?<!\\)%", r"\\%", line)
+        # Escape unescaped &
+        line = re.sub(r"(?<!\\)&", r"\\&", line)
+        fixed_lines.append(line)
+    return "\n".join(fixed_lines)
 
 
 # ============================================================
@@ -276,8 +308,8 @@ def cover_letter(state: AppState) -> dict:
     if leftover:
         print(f"WARNING: cover letter contains placeholders: {leftover}")
 
+    tex = _escape_cover_letter_specials(tex)
     return {"cover_letter_tex": tex}
-
 
 # ============================================================
 # Node 4: Evaluator
@@ -378,3 +410,50 @@ def evaluate(state: AppState) -> dict:
         "eval_report": report,
         "retry_count": new_retry_count,
     }
+
+# ============================================================
+# Node 5: ATS Pre-Check (Phase 5)
+# ============================================================
+
+def ats_precheck(state: AppState) -> dict:
+    """
+    Compute baseline ATS coverage of the base resume against the JD,
+    before any tailoring. Surfaces the gap so the user can decide to
+    improve their resume before spending tokens on generation.
+
+    Input:  state["base_resume"], state["jd_analysis"]
+    Output: {"ats_precheck": {baseline_score, matched_keywords, missing_keywords}}
+    """
+    keywords = state["jd_analysis"].get("keywords", [])
+    base_resume_lower = state["base_resume"].lower()
+
+    matched = [kw for kw in keywords if kw.lower() in base_resume_lower]
+    missing = [kw for kw in keywords if kw.lower() not in base_resume_lower]
+
+    baseline_score = len(matched) / len(keywords) if keywords else 1.0
+
+    return {
+        "ats_precheck": {
+            "baseline_score": baseline_score,
+            "matched_keywords": matched,
+            "missing_keywords": missing,
+        }
+    }
+
+# ============================================================
+# Node 6: Human Approval (Phase 5)
+# ============================================================
+
+def human_approval(state: AppState) -> dict:
+    """
+    Pass-through node that exists as an anchor for the interrupt.
+    The graph pauses BEFORE this runs so the UI can show the user
+    the evaluation results and collect a decision.
+
+    When the graph resumes:
+      - If user_decision == "revise", graph routing sends us back to tailor
+      - Otherwise (approve, or no decision), this node runs and graph ends
+    """
+    # Nothing to do; the interrupt happens before this executes.
+    # We just return an empty dict to keep state unchanged.
+    return {}

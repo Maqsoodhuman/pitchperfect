@@ -2,28 +2,31 @@ from typing import TypedDict, Optional, Literal
 
 
 class AppState(TypedDict):
-    # === Input (set at graph invocation) ===
+    # === Input ===
     user_id: str
     jd_text: str
     request_type: Literal["resume", "cover_letter", "both"]
 
-    # === Loaded from storage (Phase 2) — hardcoded for Phase 1 ===
+    # === Loaded from storage ===
     base_resume: str
 
-    # === Intake agent output ===
-    jd_analysis: Optional[dict]  # {role, skills, keywords, tone}
+    # === Intake output ===
+    jd_analysis: Optional[dict]
+
+    # === Pre-tailoring ATS check (NEW in Phase 5) ===
+    ats_precheck: Optional[dict]  # {baseline_score, matched_keywords, missing_keywords}
 
     # === Generation outputs ===
     tailored_resume_tex: Optional[str]
     cover_letter_tex: Optional[str]
 
     # === Evaluator output ===
-    eval_report: Optional[dict]  # {passed, truthfulness_score, ats_score, tone_score, issues}
+    eval_report: Optional[dict]
     retry_count: int
 
-    # === PDF outputs (Phase 4) ===
-    pdf_bytes: Optional[dict]
-
-    # === Human-in-the-loop (Phase 5) ===
-    user_decision: Optional[Literal["approve", "revise"]]
+    # === Human-in-the-loop ===
+    user_decision: Optional[Literal["approve", "revise", "proceed", "augment"]]
     user_feedback: Optional[str]
+
+    # === PDF (deferred — UI compiles on demand) ===
+    pdf_bytes: Optional[dict]
