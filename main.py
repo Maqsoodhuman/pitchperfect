@@ -1,11 +1,3 @@
-"""
-Phase 2 end-to-end entry point.
-
-Saves the fixture resume to Supabase under a test user, then invokes
-the graph with just user_id + jd_text. The graph loads base_resume
-from the DB automatically via the intake node.
-"""
-
 from dotenv import load_dotenv
 load_dotenv()
 
@@ -18,14 +10,10 @@ TEST_USER_ID = "11111111-1111-1111-1111-111111111111"
 
 
 def run():
-    # Step 1: ensure the test user has a resume saved in the DB.
-    # In Phase 3+, the user does this once via the Streamlit UI.
     print("Saving test resume to Supabase...")
     save_resume(TEST_USER_ID, SAMPLE_RESUME_TEX)
-    print(f"  ✅ saved for user {TEST_USER_ID}\n")
+    print(f"saved for user {TEST_USER_ID}\n")
 
-    # Step 2: invoke the graph with user_id + jd_text only.
-    # Intake will load base_resume from the DB.
     initial_state = {
         "user_id": TEST_USER_ID,
         "jd_text": SAMPLE_JD,
@@ -44,8 +32,6 @@ def run():
 
     final_state = graph.invoke(initial_state)
 
-    # ===== Pretty-print the result =====
-
     print("\n" + "=" * 60)
     print("  JD Analysis")
     print("=" * 60)
@@ -60,7 +46,7 @@ def run():
     print("=" * 60)
     loaded = final_state.get("base_resume", "")
     print(f"Length: {len(loaded)} chars")
-    print(f"Match:  {'✅ matches fixture' if loaded == SAMPLE_RESUME_TEX else '❌ mismatch'}")
+    print(f"Match:  {'matches fixture' if loaded == SAMPLE_RESUME_TEX else 'mismatch'}")
 
     print("\n" + "=" * 60)
     print("  Tailored Resume")
@@ -117,7 +103,7 @@ def run():
         print("Cover letter saved to output_cover_letter.tex")
 
     print("\n" + "=" * 60)
-    print("  Phase 2 end-to-end run complete ✅")
+    print("  Phase 2 end-to-end run complete")
     print("=" * 60)
 
 

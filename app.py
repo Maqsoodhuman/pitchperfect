@@ -73,7 +73,7 @@ def logout() -> None:
 # ============================================================
 
 def page_auth() -> None:
-    st.title("🎯 Pitch Perfect")
+    st.title("Pitch Perfect")
     st.caption("AI-powered resume and cover letter tailoring")
 
     tab_login, tab_signup = st.tabs(["Log in", "Sign up"])
@@ -137,11 +137,11 @@ def page_my_resume() -> None:
 
     if existing is None:
         st.warning(
-            "⚠️ You don't have a saved resume yet. "
+            "You don't have a saved resume yet. "
             "Paste your LaTeX resume below and click Save."
         )
     else:
-        st.success(f"✅ Resume saved ({len(existing)} characters)")
+        st.success(f"Resume saved ({len(existing)} characters)")
 
     resume_text = st.text_area(
         label="LaTeX source",
@@ -178,7 +178,7 @@ def page_my_resume() -> None:
                     pdf_bytes = compile_latex(resume_text)
                     st.session_state["_resume_preview_pdf"] = pdf_bytes
                     st.session_state["_resume_preview_error"] = None
-                    st.success("✅ Compiled successfully")
+                    st.success("Compiled successfully")
                 except Exception as e:
                     parsed = parse_tectonic_error(str(e), resume_text)
                     st.session_state["_resume_preview_pdf"] = None
@@ -231,7 +231,7 @@ def page_new_application() -> None:
     existing_resume = get_resume(st.session_state["user_id"])
     if existing_resume is None:
         st.warning(
-            "⚠️ You need to save a base resume first before generating an application. "
+            "You need to save a base resume first before generating an application. "
             "Go to **My Resume** in the sidebar."
         )
         if st.button("Go to My Resume", type="primary"):
@@ -367,7 +367,7 @@ def page_pre_tailoring_review() -> None:
     with st.expander(f"Matched keywords ({len(matched)})", expanded=False):
         if matched:
             for kw in matched:
-                st.markdown(f"- ✅ {kw}")
+                st.markdown(f"- {kw}")
         else:
             st.caption("None matched.")
 
@@ -380,7 +380,7 @@ def page_pre_tailoring_review() -> None:
             "If you have genuine experience with any of them, consider adding them below before tailoring."
         )
         for kw in missing:
-            st.markdown(f"- ❌ {kw}")
+            st.markdown(f"- {kw}")
 
     st.divider()
 
@@ -388,7 +388,7 @@ def page_pre_tailoring_review() -> None:
 
     with col_proceed:
         if st.button(
-            "🚀 Proceed to Tailoring",
+            "Proceed to Tailoring",
             type="primary",
             use_container_width=True,
             help="Generate the tailored resume and cover letter with your current base resume.",
@@ -398,7 +398,7 @@ def page_pre_tailoring_review() -> None:
     with col_augment:
         if missing:
             if st.button(
-                "✏️ Add missing experience first",
+                "Add missing experience first",
                 use_container_width=True,
                 help="Walk through each missing keyword and add it to your base resume if you have the experience.",
             ):
@@ -406,7 +406,7 @@ def page_pre_tailoring_review() -> None:
                 st.rerun()
         else:
             st.button(
-                "✏️ Add missing experience first",
+                "Add missing experience first",
                 use_container_width=True,
                 disabled=True,
                 help="No missing keywords to add.",
@@ -524,11 +524,11 @@ def page_augment_resume() -> None:
         col_add, col_skip = st.columns(2)
         with col_add:
             add_clicked = st.form_submit_button(
-                f"✅ Add {current_keyword}", type="primary", use_container_width=True
+                f"Add {current_keyword}", type="primary", use_container_width=True
             )
         with col_skip:
             skip_clicked = st.form_submit_button(
-                "⏭️ Skip", use_container_width=True
+                "Skip", use_container_width=True
             )
 
     if add_clicked:
@@ -678,9 +678,9 @@ def _render_evaluation_summary(result: dict) -> None:
     passed = report.get("passed", False)
 
     if passed:
-        st.success("✅ Your application passed all quality checks")
+        st.success("Your application passed all quality checks")
     else:
-        st.warning("⚠️ Your application has quality issues — see below")
+        st.warning("Your application has quality issues — see below")
 
     col1, col2, col3 = st.columns(3)
 
@@ -751,14 +751,14 @@ def _render_keyword_coverage(result: dict) -> None:
     col1, col2 = st.columns(2)
 
     with col1:
-        st.markdown(f"**✅ Matched ({len(matched)})**")
+        st.markdown(f"**Matched ({len(matched)})**")
         if matched:
             st.markdown("\n".join(f"- {kw}" for kw in matched))
         else:
             st.caption("(none)")
 
     with col2:
-        st.markdown(f"**❌ Missing ({len(missing)})**")
+        st.markdown(f"**Missing ({len(missing)})**")
         if missing:
             st.markdown("\n".join(f"- {kw}" for kw in missing))
             st.caption(
@@ -782,9 +782,9 @@ def _render_generated_outputs(result: dict) -> None:
 
     tabs = []
     if tailored:
-        tabs.append("📄 Tailored Resume")
+        tabs.append("Tailored Resume")
     if cover:
-        tabs.append("✉️ Cover Letter")
+        tabs.append("Cover Letter")
 
     tab_objects = st.tabs(tabs)
     idx = 0
@@ -826,7 +826,7 @@ def _render_document_tab(tex: str, filename: str, key: str) -> None:
         return
 
     st.download_button(
-        label="⬇️ Download PDF",
+        label="Download PDF",
         data=pdf_bytes,
         file_name=filename,
         mime="application/pdf",
