@@ -14,6 +14,8 @@ def compile_latex(tex: str) -> bytes:
     Compile a LaTeX string to PDF bytes using Tectonic.
     Raises RuntimeError with tectonic's error output if compilation fails.
     """
+    tex = re.sub(r'\bpdftex\b', 'xetex', tex)
+
     with tempfile.TemporaryDirectory() as tmpdir:
         tex_path = os.path.join(tmpdir, "doc.tex")
         pdf_path = os.path.join(tmpdir, "doc.pdf")
