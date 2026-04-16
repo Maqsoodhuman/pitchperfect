@@ -5,13 +5,20 @@
 # Use Python runtime with Tectonic support
 FROM python:3.11-slim
 
-# Install system dependencies including Tectonic
+# Install system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl \
-    && curl --proto '=https' --tlsv1.2 -sSf https://tectonic.xyz/install.sh | bash \
-    && mv /usr/local/bin/tectonic /usr/bin/tectonic \
+    wget \
+    xz-utils \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
+
+# Download and install Tectonic directly (v0.16.8)
+WORKDIR /tmp
+RUN wget https://github.com/tectonic-typesetting/tectonic/releases/download/tectonic%2Fv0.16.8/tectonic-x86_64-linux.tar.gz \
+    && tar -xzf tectonic-x86_64-linux.tar.gz \
+    && mv tectonic-x86_64-linux/tectonic /usr/local/bin/ \
+    && chmod +x /usr/local/bin/tectonic \
+    && rm -rf tectonic-x86_64-linux*
 
 # Set working directory
 WORKDIR /app
@@ -21,9 +28,6 @@ COPY requirements.txt .
 
 # Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
-
-# Remove tectonic from pip (we installed system version)
-RUN pip uninstall -y tectonic || true
 
 # Copy application code
 COPY . .
