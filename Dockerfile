@@ -14,11 +14,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Download and install Tectonic directly (v0.16.8)
 WORKDIR /tmp
-RUN wget https://github.com/tectonic-typesetting/tectonic/releases/download/tectonic%400.16.8/tectonic-0.16.8-x86_64-unknown-linux-gnu.tar.gz \
-    && tar -xzf tectonic-0.16.8-x86_64-unknown-linux-gnu.tar.gz \
+RUN wget https://github.com/tectonic-typesetting/tectonic/releases/download/tectonic%400.16.8/tectonic-0.16.8-x86_64-unknown-linux-musl.tar.gz \
+    && tar -xzf tectonic-0.16.8-x86_64-unknown-linux-musl.tar.gz \
     && mv tectonic /usr/local/bin/ \
     && chmod +x /usr/local/bin/tectonic \
-    && rm -rf tectonic-0.16.8-x86_64-unknown-linux-gnu.tar.gz
+    && rm -rf tectonic-0.16.8-x86_64-unknown-linux-musl.tar.gz
 
 # Set working directory
 WORKDIR /app
