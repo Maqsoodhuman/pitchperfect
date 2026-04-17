@@ -1,4 +1,4 @@
-# Pitch Perfect 🎯
+# Pitch Perfect
 
 Pitch Perfect is an AI-powered resume and cover letter tailoring application. It helps job seekers automatically tailor their base LaTeX resume and generate customized cover letters based on specific job descriptions. 
 
