@@ -154,7 +154,7 @@ def page_my_resume() -> None:
     col1, col2 = st.columns([1, 1])
 
     with col1:
-        if st.button("💾 Save resume", type="primary", use_container_width=True):
+        if st.button("Save resume", type="primary", use_container_width=True):
             if not resume_text.strip():
                 st.error("Resume cannot be empty.")
                 return
@@ -169,7 +169,7 @@ def page_my_resume() -> None:
             st.rerun()
 
     with col2:
-        if st.button("🔍 Preview PDF", use_container_width=True):
+        if st.button("Preview PDF", use_container_width=True):
             if not resume_text.strip():
                 st.error("Nothing to preview.")
                 return
@@ -204,7 +204,7 @@ def page_my_resume() -> None:
         st.divider()
         st.subheader("Preview")
         st.download_button(
-            label="⬇️ Download preview PDF",
+            label="Download preview PDF",
             data=preview,
             file_name="resume_preview.pdf",
             mime="application/pdf",
@@ -261,7 +261,7 @@ def page_new_application() -> None:
     }
     request_type = request_type_map[request_type_label]
 
-    if st.button("🚀 Generate", type="primary", use_container_width=True):
+    if st.button("Generate", type="primary", use_container_width=True):
         if not jd_text.strip():
             st.error("Please paste a job description.")
             return
@@ -323,7 +323,7 @@ def page_pre_tailoring_review() -> None:
     or Augment the base resume with missing keywords.
     """
     st.title("Pre-Tailoring Review")
-    st.caption("Here's how well your base resume matches this job — BEFORE any tailoring.")
+    st.caption("Here's how well your base resume matches this job before any tailoring.")
 
     from app.graph import graph
 
@@ -359,7 +359,7 @@ def page_pre_tailoring_review() -> None:
     else:
         st.warning(
             "Your base resume doesn't cover many of the JD's keywords. "
-            "Tailoring can only help so much — adding missing experience to your base resume is more effective."
+            "Tailoring can only help so much adding missing experience to your base resume is more effective."
         )
 
     st.divider()
@@ -510,7 +510,7 @@ def page_augment_resume() -> None:
     st.caption(
         "If you genuinely have experience with this (work, projects, coursework), add a short "
         "description below. This gets appended to your base resume so future applications benefit too. "
-        "If not, skip it — that's fine."
+        "If not, skip it that's fine."
     )
 
     with st.form(f"augment_form_{idx}"):
@@ -680,7 +680,7 @@ def _render_evaluation_summary(result: dict) -> None:
     if passed:
         st.success("Your application passed all quality checks")
     else:
-        st.warning("Your application has quality issues — see below")
+        st.warning("Your application has quality issues see below")
 
     col1, col2, col3 = st.columns(3)
 
@@ -728,16 +728,11 @@ def _render_added_items(result: dict) -> None:
         return
 
     st.caption(
-        "These items appear in the tailored output but are NOT in your base resume. "
+        "These items appear in the tailored output but are not in your base resume. "
         "They were added to improve JD relevance. Review them and decide if you want to keep them."
     )
     for item in added:
         st.markdown(f"- **{item}**")
-
-    st.info(
-        "💡 In a future update, you'll be able to confirm each item individually — "
-        "add it to your base resume if you have the experience, or remove it from this application."
-    )
 
 
 def _render_keyword_coverage(result: dict) -> None:
@@ -816,7 +811,7 @@ def _render_document_tab(tex: str, filename: str, key: str) -> None:
             st.code(parsed.raw, language="text")
 
         st.download_button(
-            label="⬇️ Download .tex source",
+            label="Download .tex source",
             data=tex,
             file_name=filename.replace(".pdf", ".tex"),
             mime="text/plain",
@@ -848,7 +843,7 @@ def _render_next_actions() -> None:
     """Buttons to start a new run or go back."""
     col1, col2 = st.columns(2)
     with col1:
-        if st.button("🔄 New Application", use_container_width=True, type="primary"):
+        if st.button("New Application", use_container_width=True, type="primary"):
             st.session_state["last_result"] = None
             st.session_state["_last_jd_text"] = ""
             st.session_state["thread_id"] = None
@@ -856,7 +851,7 @@ def _render_next_actions() -> None:
             st.session_state["current_page"] = "new_application"
             st.rerun()
     with col2:
-        if st.button("✏️ Edit My Resume", use_container_width=True):
+        if st.button("Edit My Resume", use_container_width=True):
             st.session_state["current_page"] = "my_resume"
             st.rerun()
 

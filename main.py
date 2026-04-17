@@ -23,7 +23,7 @@ def run():
     }
 
     print("=" * 60)
-    print("  PitchPerfect — Phase 2 End-to-End Run")
+    print("  PitchPerfect Phase to End-to-End Run")
     print("=" * 60)
     print(f"User ID:      {TEST_USER_ID}")
     print(f"Request type: {initial_state['request_type']}")
@@ -84,7 +84,7 @@ def run():
         print(f"  {i}. {issue}")
 
     added = report.get("added_items", [])
-    print(f"\nAdded items ({len(added)}) — content in tailored output NOT in base resume:")
+    print(f"\nAdded items ({len(added)}) content in tailored output NOT in base resume:")
     if added:
         for item in added:
             print(f"  + {item}")
