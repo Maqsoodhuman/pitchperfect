@@ -1,0 +1,63 @@
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv
+venv/
+ENV/
+env/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Environment and secrets
+.env
+.env.local
+.env.*.local
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+*.test.py
+
+# Documentation
+*.md
+docs/
+
+# Build artifacts
+*.pdf
+*.log
+*.aux
+*.out
+*.toc
+
+# Database
+*.db
+checkpoints.db
+
+# LaTeX build files
+*.fls
+*.fdb_latexmk
+_build/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Blog files (not needed for production)
+blog.tex
+blog.pdf
+
+# Temporary files
+*.tmp
+*.bak

@@ -1,0 +1,9 @@
+langgraph
+langchain-openai
+openai
+supabase
+streamlit
+python-dotenv
+pydantic
+langgraph-checkpoint-sqlite
+langsmith

@@ -1,0 +1,541 @@
+\documentclass[12pt, a4paper]{article}
+\usepackage[margin=1in, top=1in, bottom=1in]{geometry}
+\usepackage{times}
+\usepackage{titlesec}
+\usepackage{fancyhdr}
+\usepackage{hyperref}
+\usepackage{xcolor}
+\usepackage{graphicx}
+\usepackage{parskip}
+
+\hypersetup{
+    colorlinks=true,
+    linkcolor=blue,
+    urlcolor=blue,
+    pdftitle={PitchPerfect: Building an AI Resume Tailoring System},
+    pdfauthor={Mohammed Maqsood Ahmed}
+}
+
+\pagestyle{fancy}
+\fancyhf{}
+\rhead{\thepage}
+\lhead{PitchPerfect: AI-Powered Resume Tailoring}
+\let\origheadrule\headrule
+\def\headrule{{\color{white}\origheadrule}}
+
+\titleformat{\section}{\Large\bfseries}{\thesection}{1em}{}
+\titleformat{\subsection}{\large\bfseries}{\thesubsection}{1em}{}
+
+\begin{document}
+
+\begin{center}
+\thispagestyle{empty}
+\vspace*{2cm}
+
+{\Huge\bfseries PitchPerfect}
+
+\vspace{0.5cm}
+
+{\LARGE Building an AI Resume Tailoring System That Won't Lie for You}
+
+\vspace{1cm}
+
+{\large A technical deep-dive into creating a human-in-the-loop AI pipeline for job applications}
+
+\vspace{2cm}
+
+\textbf{Mohammed Maqsood Ahmed}
+
+\vspace{0.5cm}
+
+\textit{Building with LangGraph, Streamlit, Supabase, and Tectonic}
+
+\vfill
+
+April 2026
+
+\end{center}
+
+\newpage
+
+\tableofcontents
+\newpage
+
+\section*{Abstract}
+\addcontentsline{toc}{section}{Abstract}
+
+Applying for jobs is broken. You spend hours customizing your resume for each position, only to watch an ATS (Applicant Tracking System) filter you out because your keywords don't match. Meanwhile, AI tools promise to help but often fabricate experience you don't have.
+
+What if we could build an AI assistant that \textbf{optimizes your existing experience} for each job description---without making things up?
+
+That's exactly what \textbf{PitchPerfect} does.
+
+\newpage
+
+\section{Introduction}
+
+Job hunting in the modern era presents a paradox. On one hand, we have increasingly sophisticated AI tools that claim to help job seekers. On the other hand, the job application process has become more opaque and automated than ever.
+
+Applicant Tracking Systems (ATS) now screen the majority of applications before a human ever sees them. These systems rely heavily on keyword matching, creating pressure on candidates to ``optimize'' their resumes for algorithms rather than human readers.
+
+The problem? Most AI-powered resume tools make things up. They fabricate experience, invent metrics, and add skills you don't have. This creates a dangerous situation where job seekers risk:
+\begin{itemize}
+    \item Getting rejected at background checks
+    \item Losing credibility in interviews when they can't discuss fabricated accomplishments
+    \item Damaging their professional reputation
+\end{itemize}
+
+\textbf{PitchPerfect} takes a different approach. It helps you present your \textit{real} experience in the \textit{best possible light}---without lying.
+
+\newpage
+
+\section{The Problem with Existing Solutions}
+
+Most resume tailoring tools fall into one of several problematic categories:
+
+\subsection*{1. Fabricated Experience}
+Tools that invent experience to match keywords are dangerous and unethical. They create resumes that can't withstand scrutiny during interviews or background checks.
+
+\subsection*{2. Generic Templates}
+Some tools output the same generic content regardless of the actual job description. While ``safe,'' these outputs fail to pass ATS screening.
+
+\subsection*{3. Ignoring LaTeX Users}
+Academic and technical professionals often use LaTeX for resumes due to its superior typesetting capabilities. Most tools completely ignore this user base.
+
+\subsection*{4. Lack of Transparency}
+Many AI tools operate as black boxes, providing no visibility into what changed or why.
+
+\bigskip
+
+We needed a system that would:
+\begin{itemize}
+    \item Work with \textbf{LaTeX source} (preserving professional formatting)
+    \item \textbf{Augment, not fabricate} experience
+    \item Provide \textbf{human review} at critical decision points
+    \item Score quality objectively
+    \item Surface transparency about all changes
+\end{itemize}
+
+\newpage
+
+\section{Architecture: LangGraph-Powered Pipeline}
+
+PitchPerfect uses LangGraph to orchestrate a sophisticated multi-agent pipeline. The choice of LangGraph was strategic---it provides:
+
+\begin{itemize}
+    \item \textbf{State management} across multiple agent nodes
+    \item \textbf{Checkpointing} for pause/resume functionality
+    \item \textbf{Conditional routing} based on application state
+    \item \textbf{Human-in-the-loop interrupts} for quality control
+\end{itemize}
+
+\subsection{The State Schema}
+
+The pipeline uses a typed state dictionary that flows through all nodes:
+
+\begin{verbatim}
+class AppState(TypedDict):
+    user_id: str
+    jd_text: str
+    request_type: Literal["resume", "cover_letter", "both"]
+    base_resume: str
+    jd_analysis: dict
+    ats_precheck: dict
+    tailored_resume_tex: str
+    cover_letter_tex: str
+    eval_report: dict
+    retry_count: int
+    user_decision: str
+    user_feedback: str
+\end{verbatim}
+
+\subsection{The Graph Structure}
+
+The pipeline is built using LangGraph's StateGraph:
+
+\begin{verbatim}
+def build_graph(checkpoint_db: Path | None = None):
+    builder = StateGraph(AppState)
+
+    builder.add_node("intake", intake)
+    builder.add_node("ats_precheck", ats_precheck)
+    builder.add_node("tailor_resume", tailor_resume)
+    builder.add_node("cover_letter", cover_letter)
+    builder.add_node("evaluate", evaluate)
+    builder.add_node("human_approval", human_approval)
+
+    return builder.compile(
+        checkpointer=SqliteSaver(conn),
+        interrupt_after=["ats_precheck"],
+        interrupt_before=["human_approval"],
+    )
+\end{verbatim}
+
+\newpage
+
+\section{The Pipeline Flow}
+
+The complete pipeline consists of six nodes with two interrupt points for human oversight:
+
+\bigskip
+
+\textbf{INTRODUCE $\rightarrow$ ATS\_PRECHECK [INTERRUPT] $\rightarrow$ TAILOR\_RESUME $\rightarrow$ COVER\_LETTER $\rightarrow$ EVALUATE $\rightarrow$ HUMAN\_APPROVAL [INTERRUPT]}
+
+\bigskip
+
+\subsection*{Node 1: Intake}
+Loads the user's base resume from Supabase and parses the job description into structured analysis.
+
+\subsection*{Node 2: ATS Pre-Check (Interrupt Point)}
+Computes baseline ATS coverage before any generation. Users see matched vs. missing keywords and can augment their base resume before spending tokens.
+
+\subsection*{Node 3: Tailor Resume}
+Rewrites the base resume to emphasize JD-relevant experience using exact JD vocabulary.
+
+\subsection*{Node 4: Cover Letter}
+Generates a professional cover letter grounded entirely in base resume facts.
+
+\subsection*{Node 5: Evaluate}
+Audits the generated outputs for truthfulness, ATS match, and tone quality.
+
+\subsection*{Node 6: Human Approval (Interrupt Point)}
+Final review before download. Users see quality scores and ``added items'' for transparency.
+
+\newpage
+
+\section{Key Design: SQLite Checkpointing}
+
+One of the most important architectural decisions was using SQLite-based checkpointing:
+
+\begin{verbatim}
+conn = sqlite3.connect(str(db_path), check_same_thread=False)
+checkpointer = SqliteSaver(conn)
+
+return builder.compile(
+    checkpointer=checkpointer,
+    interrupt_after=["ats_precheck"],
+    interrupt_before=["human_approval"],
+)
+\end{verbatim}
+
+This enables three critical capabilities:
+
+\subsection*{Pause/Resume Across Sessions}
+The graph can be interrupted and later resumed from the exact same state.
+
+\subsection*{Thread-Based Isolation}
+Each job application gets its own thread ID, keeping separate applications completely independent.
+
+\subsection*{Crash Recovery}
+If the application crashes mid-pipeline, progress is not lost.
+
+\newpage
+
+\section{The Evaluator Node: Truthfulness Guardian}
+
+The most innovative part of PitchPerfect is the \texttt{evaluate} node that prevents fabrications.
+
+\subsection{Normalization for Comparison}
+
+Before comparison, job titles are normalized to avoid flagging trivial changes:
+
+\begin{verbatim}
+def _normalize_for_comparison(tex: str) -> str:
+    tex = re.sub(r"\s*\([^)]*\)", "", tex)
+    tex = re.sub(r"(,|\s-\s)\s*[A-Za-z][\w\s&/]*$", "", tex, flags=re.MULTILINE)
+    return tex
+\end{verbatim}
+
+\subsection{Divergence Score}
+
+The evaluator computes a \textbf{Divergence Score} that distinguishes between:
+
+\begin{itemize}
+    \item \textbf{Allowed (score stays high)}: Synonym swaps like ``Led team'' $\rightarrow$ ``Directed team''
+    \item \textbf{Flagged (score drops)}: Adding skills not in the base resume
+    \item \textbf{Blocked (score near zero)}: Fabricating entire roles or companies
+\end{itemize}
+
+\subsection{Deterministic ATS Scoring}
+
+Crucially, the ATS score is computed deterministically in code---not by the LLM:
+
+\begin{verbatim}
+keywords = state["jd_analysis"].get("keywords", [])
+combined_text = (state.get("tailored_resume_tex") or "") + "\n" + (state.get("cover_letter_tex") or "")
+matched_keywords = [kw for kw in keywords if kw.lower() in combined_text.lower()]
+ats_score = len(matched_keywords) / len(keywords) if keywords else 1.0
+
+report["passed"] = (
+    report["ats_score"] >= 0.6
+    and report["tone_score"] >= 0.6
+)
+\end{verbatim}
+
+This prevents gaming: the LLM can't inflate its own ATS score.
+
+\newpage
+
+\section{Page Count Enforcement}
+
+Tailored resumes must fit within the same page count as the base resume:
+
+\begin{verbatim}
+MAX_ATTEMPTS = 3
+for attempt in range(MAX_ATTEMPTS):
+    response = llm.invoke(messages)
+    tex = _strip_code_fences(response.content)
+
+    pdf = compile_latex(tex)
+    pages = count_pdf_pages(pdf)
+
+    if pages <= base_pages:
+        return {"tailored_resume_tex": tex}
+
+    messages.append({"role": "user", "content": (
+        f"Your output renders to {pages} pages, but the limit is {base_pages}. "
+        f"Regenerate the tailored resume, aggressively trimming to fit."
+    )})
+\end{verbatim}
+
+\begin{verbatim}
+def count_pdf_pages(pdf_bytes: bytes) -> int:
+    matches = re.findall(rb"/Type\s*/Page[^s]", pdf_bytes)
+    return len(matches) if matches else 1
+\end{verbatim}
+
+\newpage
+
+\section{LaTeX-Native Architecture}
+
+Unlike tools that output Word/PDF, PitchPerfect works entirely in LaTeX source throughout the pipeline.
+
+\bigskip
+
+This design choice preserves:
+\begin{itemize}
+    \item Professional typesetting quality
+    \item Complex formatting (two-column layouts, custom spacing)
+    \item Mathematical and academic notation
+    \item Complete control over visual presentation
+\end{itemize}
+
+\subsection{Compilation with Tectonic}
+
+LaTeX is compiled to PDF using Tectonic, a modern, self-contained TeX engine:
+
+\begin{verbatim}
+def compile_latex(tex: str) -> bytes:
+    with tempfile.TemporaryDirectory() as tmpdir:
+        tex_path = os.path.join(tmpdir, "doc.tex")
+        pdf_path = os.path.join(tmpdir, "doc.pdf")
+
+        with open(tex_path, "w") as f:
+            f.write(tex)
+
+        result = subprocess.run(
+            ["tectonic", "-X", "compile", tex_path, "--outdir", tmpdir],
+            capture_output=True, text=True
+        )
+
+        if result.returncode != 0:
+            raise RuntimeError(f"tectonic failed:\n{result.stderr[-1500:]}")
+\end{verbatim}
+
+Tectonic handles dependencies automatically, making deployment much simpler than traditional LaTeX setups.
+
+\newpage
+
+\section{Smart Error Handling}
+
+LaTeX errors are parsed into structured, actionable messages:
+
+\begin{verbatim}
+class ParsedError(NamedTuple):
+    line_number: Optional[int]
+    offending_line: Optional[str]
+    error_type: str
+    explanation: str
+    suggested_fix: Optional[str]
+    raw: str
+
+COMMAND_TO_PACKAGE: dict[str, str] = {
+    "justifying": "ragged2e",
+    "href": "hyperref",
+    "textcolor": "xcolor",
+    "includegraphics": "graphicx",
+    "mathbb": "amssymb",
+    "citep": "natbib",
+    "tikz": "tikz",
+}
+\end{verbatim}
+
+When Tectonic fails with an undefined command error, the system:
+\begin{enumerate}
+    \item Extracts the problematic command name
+    \item Looks it up in the package map
+    \item Provides an exact fix: \texttt{\textbackslash usepackage\{package\}}
+\end{enumerate}
+
+This transforms cryptic LaTeX errors into actionable guidance.
+
+\newpage
+
+\section{The System Prompts: Truthfulness Rules}
+
+The tailoring prompt explicitly codifies the truthfulness philosophy:
+
+\bigskip
+
+\noindent\fbox{
+\parbox{0.95\textwidth}{
+\small
+\textbf{HARD TRUTH RULES (never violate):}
+\begin{itemize}
+    \itemsep0pt
+    \item Do not invent experience, companies, job titles, dates, degrees, or metrics.
+    \item Do not change factual claims (numbers, percentages, team sizes, years).
+    \item Do not add responsibilities or achievements not supported by the base resume.
+\end{itemize}
+
+\textbf{SELF-CHECK BEFORE OUTPUTTING:}
+\begin{itemize}
+    \itemsep0pt
+    \item For each JD keyword you included: can you point to the specific base-resume fact that supports it?
+    \item Did the page count stay the same or shrink?
+\end{itemize}
+}
+}
+
+\bigskip
+
+The evaluator prompt explains how to surface additions transparently:
+
+\bigskip
+
+\noindent\fbox{
+\parbox{0.95\textwidth}{
+\small
+\textbf{added\_items:} A list of things in tailored output but NOT in base resume.
+
+\textbf{INCLUDE:} Named technologies, tools, company names, specific metrics not in base
+
+\textbf{DO NOT INCLUDE:} Synonym swaps, rephrasings, job title shortenings, reordering
+}
+}
+
+This dual-layer approach ensures users always know what was added.
+
+\newpage
+
+\section{ATS Pre-Check: Preventing Wasted Tokens}
+
+Before any generation occurs, we check the baseline ATS fit:
+
+\begin{verbatim}
+def ats_precheck(state: AppState) -> dict:
+    keywords = state["jd_analysis"].get("keywords", [])
+    base_resume_lower = state["base_resume"].lower()
+
+    matched = [kw for kw in keywords if kw.lower() in base_resume_lower]
+    missing = [kw for kw in keywords if kw.lower() not in base_resume_lower]
+    baseline_score = len(matched) / len(keywords) if keywords else 1.0
+
+    return {
+        "ats_precheck": {
+            "baseline_score": baseline_score,
+            "matched_keywords": matched,
+            "missing_keywords": missing,
+        }
+    }
+\end{verbatim}
+
+Users see exactly which keywords they're missing and can decide whether to proceed, augment, or skip.
+
+\newpage
+
+\section{Results and Key Metrics}
+
+PitchPerfect enforces strict quality gates:
+
+\begin{table}[h]
+\centering
+\begin{tabular}{|l|c|p{6cm}|}
+\hline
+\textbf{Metric} & \textbf{Threshold} & \textbf{Notes} \\
+\hline
+ATS Score & $\geq$ 60\% & Keyword match percentage, computed deterministically \\
+\hline
+Tone Score & $\geq$ 60\% & Professionalism and clarity, evaluated by LLM \\
+\hline
+Divergence Score & Informational & Measures fabrications (1.0 = none detected) \\
+\hline
+Page Count & $\leq$ Base & Enforced via retry loop \\
+\hline
+LaTeX Validity & 100\% & Must compile to proceed \\
+\hline
+\end{tabular}
+\caption{Quality gates in PitchPerfect}
+\end{table}
+
+The \textbf{Divergence Score} is informational only---it surfaces added content for user review rather than blocking. This acknowledges that adding adjacent technologies might be legitimate, and users should make the final judgment.
+
+\newpage
+
+\section{Technical Stack}
+
+PitchPerfect is built on a carefully selected technology stack:
+
+\begin{table}[h]
+\centering
+\begin{tabular}{|l|l|p{6cm}|}
+\hline
+\textbf{Component} & \textbf{Technology} & \textbf{Purpose} \\
+\hline
+AI Orchestration & LangGraph + LangChain & Agent pipeline with state management and checkpoints \\
+\hline
+LLM Provider & OpenAI GPT-4o-mini & Two roles: ``fast'' (parsing) and ``writer'' (generation) \\
+\hline
+Frontend & Streamlit & Interactive web UI with session state \\
+\hline
+Database & Supabase & User authentication and resume storage \\
+\hline
+PDF Compilation & Tectonic & Server-side LaTeX to PDF rendering \\
+\hline
+State Persistence & SQLite & Conversation checkpointing via langgraph-checkpoint-sqlite \\
+\hline
+Observability & LangSmith & Tracing and debugging LLM calls \\
+\hline
+\end{tabular}
+\caption{Technology stack overview}
+\end{table}
+
+\newpage
+
+\section{Conclusion}
+
+PitchPerfect demonstrates that AI can be a \textbf{truthful job search assistant}. By combining:
+
+\begin{enumerate}
+    \item \textbf{LangGraph's orchestration} for complex multi-agent pipelines
+    \item \textbf{SQLite checkpointing} for pause/resume across sessions
+    \item \textbf{Human interrupts} for quality control at critical decision points
+    \item \textbf{LaTeX-native processing} for professional document generation
+    \item \textbf{Truthfulness-first design} that surfaces added content transparently
+\end{enumerate}
+
+\bigskip
+
+We've built a tool that helps job seekers present their \textit{real} experience in the \textit{best possible light}---without lying.
+
+\bigskip
+
+The key insight is that AI doesn't need to fabricate to be useful. By aggressively rephrasing existing experience using a job description's exact vocabulary, reordering content to prioritize relevance, and surfacing everything transparently, we can create resumes that pass ATS screening while remaining \textbf{100\% truthful}.
+
+\vfill
+
+\begin{center}
+\textit{Built with LangGraph, Streamlit, Supabase, and Tectonic}
+\end{center}
+
+\end{document}

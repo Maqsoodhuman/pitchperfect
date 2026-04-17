@@ -1,0 +1,14 @@
+venv/
+__pycache__/
+*.pyc
+.env
+.venv
+.DS_Store
+checkpoints.db
+*.pdf
+*.aux
+*.log
+checkpoints.db-shm
+checkpoints.db-wal
+checkpoints.db-shm
+checkpoints.db-wal
