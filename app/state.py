@@ -13,7 +13,7 @@ class AppState(TypedDict):
     # === Intake output ===
     jd_analysis: Optional[dict]
 
-    # === Pre-tailoring ATS check (NEW in Phase 5) ===
+    # === Pre-tailoring ATS check ===
     ats_precheck: Optional[dict]  # {baseline_score, matched_keywords, missing_keywords}
 
     # === Generation outputs ===
@@ -28,5 +28,5 @@ class AppState(TypedDict):
     user_decision: Optional[Literal["approve", "revise", "proceed", "augment"]]
     user_feedback: Optional[str]
 
-    # === PDF (deferred — UI compiles on demand) ===
+    # === PDF ===
     pdf_bytes: Optional[dict]
