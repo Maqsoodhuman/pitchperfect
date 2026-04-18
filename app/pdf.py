@@ -1,6 +1,6 @@
 """
 LaTeX -> PDF compilation helpers using Tectonic.
-Used by the tailor_resume retry loop (Phase 1) and the compile_pdf node (Phase 4).
+Used by the tailor_resume retry loop and the compile_pdf node.
 """
 
 import os
