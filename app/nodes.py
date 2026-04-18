@@ -315,10 +315,6 @@ def cover_letter(state: AppState) -> dict:
 # Node 4: Evaluator
 # ============================================================
 
-# ============================================================
-# Node 4: Evaluator (Auditor mode — informs, never blocks)
-# ============================================================
-
 def evaluate(state: AppState) -> dict:
     """
     Audit the generated outputs. Reports divergence, ATS, tone, and
@@ -412,7 +408,7 @@ def evaluate(state: AppState) -> dict:
     }
 
 # ============================================================
-# Node 5: ATS Pre-Check (Phase 5)
+# Node 5: ATS Pre-Check
 # ============================================================
 
 def ats_precheck(state: AppState) -> dict:
@@ -441,7 +437,7 @@ def ats_precheck(state: AppState) -> dict:
     }
 
 # ============================================================
-# Node 6: Human Approval (Phase 5)
+# Node 6: Human Approval
 # ============================================================
 
 def human_approval(state: AppState) -> dict:
