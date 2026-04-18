@@ -1,4 +1,5 @@
 # Pitch Perfect
+<img width="1400" height="1019" alt="image" src="https://github.com/user-attachments/assets/205fb225-3dc2-4222-aad1-71199a7c268e" />
 
 Pitch Perfect is an AI-powered resume and cover letter tailoring application. It helps job seekers automatically tailor their base LaTeX resume and generate customized cover letters based on specific job descriptions. 
 
